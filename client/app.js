@@ -99,7 +99,7 @@ function setOptions() {
     const label = make('label', 'repeat-day');
     const input = document.createElement('input');
     input.type = 'checkbox'; input.name = 'repeatWeekday'; input.value = String(index + 1);
-    const text = make('span', '', day.slice(0, 3));
+    const text = make('span', '', day);
     label.append(input, text); repeatDays.append(label);
   });
   const colors = document.querySelector('#colors');

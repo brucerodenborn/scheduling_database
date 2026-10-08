@@ -51,7 +51,9 @@ test('serves the scheduler, assets and readiness', async () => withServer(async 
   const page = await fetch(origin);
   assert.equal(page.status, 200);
   assert.match(await page.text(), /Weekly schedule/);
-  assert.equal((await fetch(`${origin}/styles.css`)).status, 200);
+  const styles = await fetch(`${origin}/styles.css`);
+  assert.equal(styles.status, 200);
+  assert.match(await styles.text(), /\.repeat-day input\{[^}]*opacity:1[^}]*pointer-events:auto/);
   assert.deepEqual(await (await fetch(`${origin}/health/ready`)).json(), { status: 'ready' });
   assert.equal((await fetch(`${origin}/missing`)).status, 404);
 }));
