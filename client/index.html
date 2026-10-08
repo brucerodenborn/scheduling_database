@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="auth-token" content="%%AUTH_TOKEN%%">
+  <meta name="auth-ready" content="%%AUTH_READY%%">
+  <title>Course Schedule</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Course Schedule home">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span>Course Schedule</span>
+      </a>
+      <nav aria-label="Main navigation">
+        <a class="nav-item active" href="/">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11ZM8 2v4M16 2v4M4 9h16"/></svg>
+          Weekly schedule
+        </a>
+      </nav>
+      <div class="day-settings">
+        <p class="eyebrow">Day settings</p>
+        <div class="setting-row"><span>Day starts</span><strong>8:00 AM</strong></div>
+        <div class="setting-row"><span>Day ends</span><strong>4:00 PM</strong></div>
+        <div class="setting-row"><span>Class length</span><strong>1 hour</strong></div>
+        <div class="setting-row"><span>Break</span><strong>10 min</strong></div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Academic planner</p>
+          <h1>Weekly schedule</h1>
+        </div>
+        <button class="primary" id="add-course" type="button">
+          <span aria-hidden="true">+</span> Add course
+        </button>
+      </header>
+
+      <section class="summary" aria-label="Schedule summary">
+        <article><span class="summary-icon sage">▦</span><div><strong id="class-count">—</strong><span>Classes</span></div></article>
+        <article><span class="summary-icon blue">◷</span><div><strong id="hour-count">—</strong><span>Teaching hours</span></div></article>
+        <article><span class="summary-icon amber">☀</span><div><strong>7</strong><span>Daily time blocks</span></div></article>
+      </section>
+
+      <section class="schedule-panel" aria-labelledby="schedule-title">
+        <div class="panel-heading">
+          <div><h2 id="schedule-title">Monday–Friday</h2><p>8:00 AM–4:00 PM</p></div>
+          <button class="refresh" id="refresh" type="button" aria-label="Refresh schedule">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7"/></svg>
+          </button>
+        </div>
+        <div class="message hidden" id="message" role="status"></div>
+        <div class="table-wrap">
+          <div class="schedule-grid" id="schedule-grid" aria-live="polite">
+            <div class="loading">Loading schedule…</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="course-dialog">
+    <form id="course-form">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Course details</p><h2 id="dialog-title">Add course</h2></div>
+        <button class="icon-button" id="close-dialog" type="button" aria-label="Close">×</button>
+      </div>
+      <input type="hidden" name="meetingId">
+      <div class="field full"><label for="name">Course name</label><input id="name" name="name" maxlength="80" required autocomplete="off" placeholder="Introduction to Biology"></div>
+      <div class="form-row">
+        <div class="field"><label for="code">Course code</label><input id="code" name="code" maxlength="20" autocomplete="off" placeholder="BIO 101"></div>
+        <div class="field"><label for="instructor">Instructor</label><input id="instructor" name="instructor" maxlength="80" autocomplete="off" placeholder="Dr. Rivera"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label for="weekday">Day</label><select id="weekday" name="weekday"></select></div>
+        <div class="field"><label for="slotIndex">Time</label><select id="slotIndex" name="slotIndex"></select></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label for="room">Room</label><input id="room" name="room" maxlength="40" autocomplete="off" placeholder="Room 204"></div>
+        <fieldset class="field color-field"><legend>Color</legend><div class="colors" id="colors"></div></fieldset>
+      </div>
+      <div class="form-error hidden" id="form-error" role="alert"></div>
+      <div class="dialog-actions">
+        <button class="danger hidden" id="delete-course" type="button">Delete</button>
+        <span class="action-spacer"></span>
+        <button class="secondary" id="cancel-dialog" type="button">Cancel</button>
+        <button class="primary" id="save-course" type="submit">Save course</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="/app.js" defer></script>
+</body>
+</html>

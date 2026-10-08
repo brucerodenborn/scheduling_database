@@ -1,0 +1,41 @@
+{
+  "entities": [
+    {
+      "name": "Course",
+      "identifier": { "name": "courseId", "generator": "UUID", "type": "String" },
+      "type": "DEFAULT",
+      "attributes": [
+        { "name": "courseId", "type": "String", "isNullable": false },
+        { "name": "name", "type": "String", "isNullable": false },
+        { "name": "code", "type": "String", "isNullable": false },
+        { "name": "instructor", "type": "String", "isNullable": false },
+        { "name": "color", "type": "String", "isNullable": false },
+        { "name": "createdAt", "type": "Timestamp", "isNullable": false }
+      ],
+      "indexes": [
+        { "name": "name", "type": "DEFAULT" },
+        { "name": "code", "type": "DEFAULT" }
+      ]
+    },
+    {
+      "name": "CourseMeeting",
+      "identifier": { "name": "meetingId", "generator": "UUID", "type": "String" },
+      "type": "DEFAULT",
+      "attributes": [
+        { "name": "meetingId", "type": "String", "isNullable": false },
+        { "name": "courseId", "type": "String", "isNullable": false },
+        { "name": "weekday", "type": "Int", "isNullable": false },
+        { "name": "slotIndex", "type": "Int", "isNullable": false },
+        { "name": "startMinutes", "type": "Int", "isNullable": false },
+        { "name": "endMinutes", "type": "Int", "isNullable": false },
+        { "name": "room", "type": "String", "isNullable": false },
+        { "name": "createdAt", "type": "Timestamp", "isNullable": false }
+      ],
+      "indexes": [
+        { "name": "courseId", "type": "DEFAULT" },
+        { "name": "weekday", "type": "DEFAULT" },
+        { "name": "slotIndex", "type": "DEFAULT" }
+      ]
+    }
+  ]
+}

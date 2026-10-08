@@ -1,17 +1,22 @@
-# Blank Canvas
+# Course Schedule
 
-Run `npm ci` and `npm run dev`, then open port 3000. Readiness is `/health/ready`.
-Use `npm run build`, `npm start`, and `npm test` to verify and run the application.
-This canvas has no example business logic or schema migrations.
+A database-backed weekly course scheduler with seven one-hour class blocks from 8:00 AM to 4:00 PM and a 10-minute break between classes.
 
-A database can be selected during creation or attached later in Workspaces → Environments.
-Provisioned credentials are injected into the server; never copy keys into project files.
-`server/database.mjs` provides a lazy, server-only official Onyx SDK client. Use it from
-authenticated, authorized routes when adding database features. Read `ONYX.md` first.
-Missing bindings raise a setup error; no data is cached or substituted. The canvas itself
-does not query a database or imply that its connection has been verified.
+## Run
 
-If `WORKSPACE_TYPE.md` is present, workspace setup uses your connected AI account or configured Onyx model to
-build that specialized starter before opening preview. Follow its task progress in
-Workspaces. If account access fails, reconnect your AI account and retry setup. Review
-generated migrations and external service requirements before enabling those features.
+```bash
+npm ci
+npm run dev
+```
+
+Open port 3000. Readiness is available at `/health/ready`.
+
+The application uses the Onyx database credentials injected by the workspace runtime. Apply the versioned database schema with `npm run migrate`; validate migration files with `npm run migrate:check`.
+
+## Verify
+
+```bash
+npm run build
+npm test
+npm start
+```
