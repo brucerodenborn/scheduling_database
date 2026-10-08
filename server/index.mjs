@@ -163,7 +163,7 @@ export function createApplication(options = {}) {
       if (request.method === 'GET' && url.pathname === '/') return await servePage(response, env);
       if (request.method === 'GET' && ['/styles.css', '/app.js'].includes(url.pathname)) {
         const file = join(root, 'client', url.pathname.slice(1));
-        response.writeHead(200, { 'Content-Type': contentTypes[extname(file)], 'Cache-Control': 'no-cache' });
+        response.writeHead(200, { 'Content-Type': contentTypes[extname(file)], 'Cache-Control': 'no-store' });
         response.end(await readFile(file)); return;
       }
       if (!url.pathname.startsWith('/api/')) { response.writeHead(404); response.end('Not found'); return; }

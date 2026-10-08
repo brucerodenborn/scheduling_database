@@ -120,6 +120,9 @@ function openDialog(item, weekday = 1, slotIndex = 0) {
   form.reset();
   formError.classList.add('hidden');
   formError.textContent = '';
+  delete deleteButton.dataset.confirming;
+  deleteButton.textContent = 'Delete course';
+  deleteButton.disabled = false;
   form.elements.meetingId.value = item?.meetingId || '';
   form.elements.name.value = item?.course.name || '';
   form.elements.code.value = item?.course.code || '';
@@ -162,10 +165,18 @@ form.addEventListener('submit', async event => {
 
 deleteButton.addEventListener('click', async () => {
   const meetingId = form.elements.meetingId.value;
-  if (!meetingId || !confirm('Delete this course from every scheduled day?')) return;
+  if (!meetingId) return;
+  if (deleteButton.dataset.confirming !== 'true') {
+    deleteButton.dataset.confirming = 'true';
+    deleteButton.textContent = 'Confirm delete everywhere';
+    return;
+  }
   deleteButton.disabled = true;
   try { await api(`/api/schedule/${meetingId}`, { method: 'DELETE' }); closeDialog(); await load(); }
-  catch (error) { formError.textContent = error.message; formError.classList.remove('hidden'); }
+  catch (error) {
+    formError.textContent = error.message; formError.classList.remove('hidden');
+    delete deleteButton.dataset.confirming; deleteButton.textContent = 'Delete course';
+  }
   finally { deleteButton.disabled = false; }
 });
 

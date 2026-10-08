@@ -55,7 +55,14 @@ test('serves the scheduler, assets and readiness', async () => withServer(async 
   assert.ok(markup.indexOf('Monday–Wednesday–Friday') < markup.indexOf('Tuesday–Thursday'));
   assert.ok(markup.indexOf('Tuesday–Thursday') < markup.indexOf('<optgroup label="Single day">'));
   assert.doesNotMatch(markup, /Also repeat on/);
-  assert.equal((await fetch(`${origin}/styles.css`)).status, 200);
+  assert.match(markup, /\/app\.js\?v=4/);
+  const script = await fetch(`${origin}/app.js?v=4`);
+  assert.equal(script.status, 200);
+  assert.equal(script.headers.get('cache-control'), 'no-store');
+  const source = await script.text();
+  assert.doesNotMatch(source, /\bconfirm\(/);
+  assert.match(source, /Confirm delete everywhere/);
+  assert.equal((await fetch(`${origin}/styles.css?v=4`)).status, 200);
   assert.deepEqual(await (await fetch(`${origin}/health/ready`)).json(), { status: 'ready' });
   assert.equal((await fetch(`${origin}/missing`)).status, 404);
 }));
