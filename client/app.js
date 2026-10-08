@@ -45,8 +45,8 @@ function render() {
     grid.append(time);
     for (let weekday = 1; weekday <= 5; weekday++) {
       const cell = make('div', 'slot-cell');
-      const item = schedule.find(entry => entry.weekday === weekday && entry.slotIndex === slot.slotIndex);
-      if (item) {
+      const items = schedule.filter(entry => entry.weekday === weekday && entry.slotIndex === slot.slotIndex);
+      for (const item of items) {
         const card = make('button', `course-card ${item.course.color}`);
         card.type = 'button';
         card.setAttribute('aria-label', `Edit ${item.course.name}, ${days[weekday - 1]} ${slotLabel(slot)}`);
@@ -56,13 +56,12 @@ function render() {
         if (detail) card.append(make('span', 'detail', detail));
         card.addEventListener('click', () => openDialog(item));
         cell.append(card);
-      } else {
-        const add = make('button', 'empty-slot', '+ Add');
-        add.type = 'button';
-        add.setAttribute('aria-label', `Add course on ${days[weekday - 1]} at ${formatTime(slot.startMinutes)}`);
-        add.addEventListener('click', () => openDialog(null, weekday, slot.slotIndex));
-        cell.append(add);
       }
+      const add = make('button', items.length ? 'add-to-slot' : 'empty-slot', items.length ? '+ Add another' : '+ Add');
+      add.type = 'button';
+      add.setAttribute('aria-label', `Add course on ${days[weekday - 1]} at ${formatTime(slot.startMinutes)}`);
+      add.addEventListener('click', () => openDialog(null, weekday, slot.slotIndex));
+      cell.append(add);
       grid.append(cell);
     }
   }

@@ -9,7 +9,6 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const slots = [480, 550, 620, 690, 760, 830, 900].map((startMinutes, slotIndex) => ({
   slotIndex, startMinutes, endMinutes: startMinutes + 60,
 }));
-const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const colors = new Set(['sage', 'blue', 'violet', 'amber', 'rose', 'teal']);
 const contentTypes = { '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
 
@@ -71,19 +70,6 @@ function validateCourse(input) {
   };
 }
 
-function assertOpenDays(meetings, weekdays, slotIndex, ignoredCourseId = null) {
-  const conflict = meetings.find(item => ignoredCourseId !== item.courseId && weekdays.includes(item.weekday) && item.slotIndex === slotIndex);
-  if (conflict) {
-    throw Object.assign(new Error(`${dayNames[conflict.weekday - 1]} at ${formatTime(slots[slotIndex].startMinutes)} is already booked.`), { status: 409 });
-  }
-}
-
-function formatTime(minutes) {
-  const hours = Math.floor(minutes / 60);
-  const clock = hours % 12 || 12;
-  return `${clock}:${String(minutes % 60).padStart(2, '0')} ${hours < 12 ? 'AM' : 'PM'}`;
-}
-
 async function allRecords(query) {
   const result = await query.limit(500).list();
   return Array.from(result);
@@ -102,8 +88,6 @@ async function loadSchedule(db) {
 
 async function saveNew(db, input) {
   const value = validateCourse(input);
-  const meetings = await allRecords(db.from('CourseMeeting'));
-  assertOpenDays(meetings, value.weekdays, value.slot.slotIndex);
   const now = new Date().toISOString();
   const courseId = randomUUID();
   const records = value.weekdays.map(weekday => ({ meetingId: randomUUID(), courseId, weekday,
@@ -125,7 +109,6 @@ async function updateExisting(db, meetingId, input) {
   const schedule = await loadSchedule(db);
   const existing = schedule.find(item => item.meetingId === meetingId);
   if (!existing) throw Object.assign(new Error('Course not found.'), { status: 404 });
-  assertOpenDays(schedule, value.weekdays, value.slot.slotIndex, existing.courseId);
   const courseMeetings = schedule.filter(item => item.courseId === existing.courseId);
   const byWeekday = new Map(courseMeetings.map(item => [item.weekday, item]));
   const now = new Date().toISOString();

@@ -55,14 +55,15 @@ test('serves the scheduler, assets and readiness', async () => withServer(async 
   assert.ok(markup.indexOf('Monday–Wednesday–Friday') < markup.indexOf('Tuesday–Thursday'));
   assert.ok(markup.indexOf('Tuesday–Thursday') < markup.indexOf('<optgroup label="Single day">'));
   assert.doesNotMatch(markup, /Also repeat on/);
-  assert.match(markup, /\/app\.js\?v=4/);
-  const script = await fetch(`${origin}/app.js?v=4`);
+  assert.match(markup, /\/app\.js\?v=5/);
+  const script = await fetch(`${origin}/app.js?v=5`);
   assert.equal(script.status, 200);
   assert.equal(script.headers.get('cache-control'), 'no-store');
   const source = await script.text();
   assert.doesNotMatch(source, /\bconfirm\(/);
   assert.match(source, /Confirm delete everywhere/);
-  assert.equal((await fetch(`${origin}/styles.css?v=4`)).status, 200);
+  assert.match(source, /add-to-slot/);
+  assert.equal((await fetch(`${origin}/styles.css?v=5`)).status, 200);
   assert.deepEqual(await (await fetch(`${origin}/health/ready`)).json(), { status: 'ready' });
   assert.equal((await fetch(`${origin}/missing`)).status, 404);
 }));
@@ -88,20 +89,25 @@ test('creates, lists, updates and deletes a recurring course', async () => withS
   assert.equal(list.schedule.length, 3);
   assert.equal(list.slots.length, 7);
 
-  const conflict = await fetch(`${origin}/api/schedule`, { method: 'POST', headers: headers(origin), body: JSON.stringify({ ...course, name: 'Chemistry', weekday: 2, weekdays: [2, 3] }) });
-  assert.equal(conflict.status, 409);
-  assert.match((await conflict.json()).error, /Wednesday/);
+  const overlapping = await fetch(`${origin}/api/schedule`, { method: 'POST', headers: headers(origin), body: JSON.stringify({ ...course, name: 'Chemistry', weekday: 2, weekdays: [2, 3] }) });
+  assert.equal(overlapping.status, 201);
+  const { meetingIds: overlappingMeetingIds } = await overlapping.json();
+  assert.equal(overlappingMeetingIds.length, 2);
+  assert.equal(db.tables.Course.length, 2);
+  assert.equal(db.tables.CourseMeeting.filter(item => item.weekday === 3 && item.slotIndex === 0).length, 2);
 
   const updated = await fetch(`${origin}/api/schedule/${meetingIds[0]}`, { method: 'PATCH', headers: headers(origin), body: JSON.stringify({ ...course, name: 'Advanced Biology', weekday: 2, weekdays: [2, 4], slotIndex: 6 }) });
   assert.equal(updated.status, 200);
   assert.equal(db.tables.Course[0].name, 'Advanced Biology');
-  assert.deepEqual(db.tables.CourseMeeting.map(item => item.weekday).sort(), [2, 4]);
-  assert.ok(db.tables.CourseMeeting.every(item => item.startMinutes === 900));
+  const biologyMeetings = db.tables.CourseMeeting.filter(item => item.courseId === db.tables.Course[0].courseId);
+  assert.deepEqual(biologyMeetings.map(item => item.weekday).sort(), [2, 4]);
+  assert.ok(biologyMeetings.every(item => item.startMinutes === 900));
 
-  const deleted = await fetch(`${origin}/api/schedule/${db.tables.CourseMeeting[0].meetingId}`, { method: 'DELETE', headers: headers(origin) });
+  const deleted = await fetch(`${origin}/api/schedule/${biologyMeetings[0].meetingId}`, { method: 'DELETE', headers: headers(origin) });
   assert.equal(deleted.status, 200);
-  assert.equal(db.tables.Course.length, 0);
-  assert.equal(db.tables.CourseMeeting.length, 0);
+  assert.equal(db.tables.Course.length, 1);
+  assert.equal(db.tables.CourseMeeting.length, 2);
+  assert.equal(db.tables.Course[0].name, 'Chemistry');
 }));
 
 test('rejects invalid schedules and cross-origin mutations', async () => withServer(async ({ origin }) => {
