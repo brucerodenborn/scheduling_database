@@ -1,0 +1,14 @@
+{
+  "name": "onyx-application",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server/index.mjs",
+    "build": "node --check server/index.mjs",
+    "start": "node server/index.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": { "node": ">=22" },
+  "dependencies": { "@onyx.dev/onyx-database": "2.8.1" }
+}
