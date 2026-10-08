@@ -89,19 +89,8 @@ async function load() {
 }
 
 function setOptions() {
-  const weekday = form.elements.weekday;
   const slotIndex = form.elements.slotIndex;
-  weekday.replaceChildren(...days.map((day, index) => new Option(day, String(index + 1))));
   slotIndex.replaceChildren(...slots.map(slot => new Option(slotLabel(slot), String(slot.slotIndex))));
-  const repeatDays = document.querySelector('#repeat-days');
-  repeatDays.replaceChildren();
-  days.forEach((day, index) => {
-    const label = make('label', 'repeat-day');
-    const input = document.createElement('input');
-    input.type = 'checkbox'; input.name = 'repeatWeekday'; input.value = String(index + 1);
-    const text = make('span', '', day);
-    label.append(input, text); repeatDays.append(label);
-  });
   const colors = document.querySelector('#colors');
   colors.replaceChildren();
   palette.forEach((color, index) => {
@@ -111,20 +100,20 @@ function setOptions() {
     const dot = make('span', color); dot.title = color;
     label.append(input, dot); colors.append(label);
   });
-  weekday.addEventListener('change', () => updateRepeatDays(selectedRepeatDays()));
 }
 
-function selectedRepeatDays() {
-  return [...form.querySelectorAll('input[name="repeatWeekday"]:checked')].map(input => Number(input.value));
-}
-
-function updateRepeatDays(selectedDays = []) {
-  const primaryDay = Number(form.elements.weekday.value);
-  form.querySelectorAll('input[name="repeatWeekday"]').forEach(input => {
-    const day = Number(input.value);
-    input.disabled = day === primaryDay;
-    input.checked = day !== primaryDay && selectedDays.includes(day);
-  });
+function setDaySchedule(selectedDays) {
+  const weekday = form.elements.weekday;
+  const weekdays = [...new Set(selectedDays)].sort((a, b) => a - b);
+  const value = weekdays.join(',');
+  const currentGroup = document.querySelector('#current-schedule-options');
+  currentGroup.replaceChildren();
+  currentGroup.hidden = true;
+  if (![...weekday.options].some(option => option.value === value)) {
+    currentGroup.append(new Option(weekdays.map(day => days[day - 1]).join('–'), value));
+    currentGroup.hidden = false;
+  }
+  weekday.value = value;
 }
 
 function openDialog(item, weekday = 1, slotIndex = 0) {
@@ -136,10 +125,9 @@ function openDialog(item, weekday = 1, slotIndex = 0) {
   form.elements.code.value = item?.course.code || '';
   form.elements.instructor.value = item?.course.instructor || '';
   form.elements.room.value = item?.room || '';
-  form.elements.weekday.value = String(item?.weekday || weekday);
   form.elements.slotIndex.value = String(item?.slotIndex ?? slotIndex);
   const selectedDays = item ? schedule.filter(entry => entry.courseId === item.courseId).map(entry => entry.weekday) : [weekday];
-  updateRepeatDays(selectedDays);
+  setDaySchedule(selectedDays);
   const color = item?.course.color || 'sage';
   const colorInput = form.querySelector(`input[name="color"][value="${color}"]`);
   if (colorInput) colorInput.checked = true;
@@ -154,8 +142,8 @@ function closeDialog() { if (dialog.open) dialog.close(); }
 function formPayload() {
   const values = new FormData(form);
   const payload = Object.fromEntries(values.entries());
-  payload.weekdays = [...new Set([Number(payload.weekday), ...selectedRepeatDays()])];
-  delete payload.repeatWeekday;
+  payload.weekdays = payload.weekday.split(',').map(Number);
+  payload.weekday = payload.weekdays[0];
   return payload;
 }
 

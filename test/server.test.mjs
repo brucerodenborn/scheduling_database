@@ -50,10 +50,12 @@ const course = { name: 'Biology', code: 'BIO 101', instructor: 'Dr. Rivera', roo
 test('serves the scheduler, assets and readiness', async () => withServer(async ({ origin }) => {
   const page = await fetch(origin);
   assert.equal(page.status, 200);
-  assert.match(await page.text(), /Weekly schedule/);
-  const styles = await fetch(`${origin}/styles.css`);
-  assert.equal(styles.status, 200);
-  assert.match(await styles.text(), /\.repeat-day input\{[^}]*opacity:1[^}]*pointer-events:auto/);
+  const markup = await page.text();
+  assert.match(markup, /Weekly schedule/);
+  assert.ok(markup.indexOf('Monday–Wednesday–Friday') < markup.indexOf('Tuesday–Thursday'));
+  assert.ok(markup.indexOf('Tuesday–Thursday') < markup.indexOf('<optgroup label="Single day">'));
+  assert.doesNotMatch(markup, /Also repeat on/);
+  assert.equal((await fetch(`${origin}/styles.css`)).status, 200);
   assert.deepEqual(await (await fetch(`${origin}/health/ready`)).json(), { status: 'ready' });
   assert.equal((await fetch(`${origin}/missing`)).status, 404);
 }));

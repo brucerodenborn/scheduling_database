@@ -77,13 +77,22 @@
         <div class="field"><label for="instructor">Instructor</label><input id="instructor" name="instructor" maxlength="80" autocomplete="off" placeholder="Dr. Rivera"></div>
       </div>
       <div class="form-row">
-        <div class="field"><label for="weekday">Day</label><select id="weekday" name="weekday"></select></div>
+        <div class="field"><label for="weekday">Day or schedule</label><select id="weekday" name="weekday">
+          <optgroup label="Common schedules">
+            <option value="1,3,5">Monday–Wednesday–Friday</option>
+            <option value="2,4">Tuesday–Thursday</option>
+          </optgroup>
+          <optgroup label="Current schedule" id="current-schedule-options" hidden></optgroup>
+          <optgroup label="Single day">
+            <option value="1">Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+            <option value="5">Friday</option>
+          </optgroup>
+        </select></div>
         <div class="field"><label for="slotIndex">Time</label><select id="slotIndex" name="slotIndex"></select></div>
       </div>
-      <fieldset class="field repeat-field">
-        <legend>Also repeat on</legend>
-        <div class="repeat-days" id="repeat-days"></div>
-      </fieldset>
       <div class="form-row">
         <div class="field"><label for="room">Room</label><input id="room" name="room" maxlength="40" autocomplete="off" placeholder="Room 204"></div>
         <fieldset class="field color-field"><legend>Color</legend><div class="colors" id="colors"></div></fieldset>
