@@ -80,13 +80,17 @@
         <div class="field"><label for="weekday">Day</label><select id="weekday" name="weekday"></select></div>
         <div class="field"><label for="slotIndex">Time</label><select id="slotIndex" name="slotIndex"></select></div>
       </div>
+      <fieldset class="field repeat-field">
+        <legend>Also repeat on</legend>
+        <div class="repeat-days" id="repeat-days"></div>
+      </fieldset>
       <div class="form-row">
         <div class="field"><label for="room">Room</label><input id="room" name="room" maxlength="40" autocomplete="off" placeholder="Room 204"></div>
         <fieldset class="field color-field"><legend>Color</legend><div class="colors" id="colors"></div></fieldset>
       </div>
       <div class="form-error hidden" id="form-error" role="alert"></div>
       <div class="dialog-actions">
-        <button class="danger hidden" id="delete-course" type="button">Delete</button>
+        <button class="danger hidden" id="delete-course" type="button">Delete course</button>
         <span class="action-spacer"></span>
         <button class="secondary" id="cancel-dialog" type="button">Cancel</button>
         <button class="primary" id="save-course" type="submit">Save course</button>

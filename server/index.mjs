@@ -9,6 +9,7 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const slots = [480, 550, 620, 690, 760, 830, 900].map((startMinutes, slotIndex) => ({
   slotIndex, startMinutes, endMinutes: startMinutes + 60,
 }));
+const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const colors = new Set(['sage', 'blue', 'violet', 'amber', 'rose', 'teal']);
 const contentTypes = { '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8' };
 
@@ -58,11 +59,29 @@ function validateCourse(input) {
   if (!Number.isInteger(weekday) || weekday < 1 || weekday > 5 || !slot) {
     throw Object.assign(new Error('Choose a valid weekday and time.'), { status: 400 });
   }
+  const requestedWeekdays = Array.isArray(input.weekdays) ? input.weekdays : [weekday];
+  const weekdays = [...new Set([weekday, ...requestedWeekdays.map(Number)])].sort((a, b) => a - b);
+  if (weekdays.some(day => !Number.isInteger(day) || day < 1 || day > 5)) {
+    throw Object.assign(new Error('Choose valid repeat days.'), { status: 400 });
+  }
   return {
     name: clean(input.name, 80), code: clean(input.code, 20, false),
     instructor: clean(input.instructor, 80, false), room: clean(input.room, 40, false),
-    color: colors.has(input.color) ? input.color : 'sage', weekday, slot,
+    color: colors.has(input.color) ? input.color : 'sage', weekday, weekdays, slot,
   };
+}
+
+function assertOpenDays(meetings, weekdays, slotIndex, ignoredCourseId = null) {
+  const conflict = meetings.find(item => ignoredCourseId !== item.courseId && weekdays.includes(item.weekday) && item.slotIndex === slotIndex);
+  if (conflict) {
+    throw Object.assign(new Error(`${dayNames[conflict.weekday - 1]} at ${formatTime(slots[slotIndex].startMinutes)} is already booked.`), { status: 409 });
+  }
+}
+
+function formatTime(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const clock = hours % 12 || 12;
+  return `${clock}:${String(minutes % 60).padStart(2, '0')} ${hours < 12 ? 'AM' : 'PM'}`;
 }
 
 async function allRecords(query) {
@@ -84,21 +103,21 @@ async function loadSchedule(db) {
 async function saveNew(db, input) {
   const value = validateCourse(input);
   const meetings = await allRecords(db.from('CourseMeeting'));
-  if (meetings.some(item => item.weekday === value.weekday && item.slotIndex === value.slot.slotIndex)) {
-    throw Object.assign(new Error('That time is already booked.'), { status: 409 });
-  }
+  assertOpenDays(meetings, value.weekdays, value.slot.slotIndex);
   const now = new Date().toISOString();
   const courseId = randomUUID();
-  const meetingId = randomUUID();
+  const records = value.weekdays.map(weekday => ({ meetingId: randomUUID(), courseId, weekday,
+    slotIndex: value.slot.slotIndex, startMinutes: value.slot.startMinutes, endMinutes: value.slot.endMinutes,
+    room: value.room, createdAt: now }));
   await db.save('Course', { courseId, name: value.name, code: value.code, instructor: value.instructor, color: value.color, createdAt: now });
   try {
-    await db.save('CourseMeeting', { meetingId, courseId, weekday: value.weekday, slotIndex: value.slot.slotIndex,
-      startMinutes: value.slot.startMinutes, endMinutes: value.slot.endMinutes, room: value.room, createdAt: now });
+    await db.save('CourseMeeting', records);
   } catch (error) {
+    for (const record of records) await db.delete('CourseMeeting', record.meetingId).catch(() => {});
     await db.delete('Course', courseId).catch(() => {});
     throw error;
   }
-  return meetingId;
+  return records.map(record => record.meetingId);
 }
 
 async function updateExisting(db, meetingId, input) {
@@ -106,13 +125,20 @@ async function updateExisting(db, meetingId, input) {
   const schedule = await loadSchedule(db);
   const existing = schedule.find(item => item.meetingId === meetingId);
   if (!existing) throw Object.assign(new Error('Course not found.'), { status: 404 });
-  if (schedule.some(item => item.meetingId !== meetingId && item.weekday === value.weekday && item.slotIndex === value.slot.slotIndex)) {
-    throw Object.assign(new Error('That time is already booked.'), { status: 409 });
-  }
+  assertOpenDays(schedule, value.weekdays, value.slot.slotIndex, existing.courseId);
+  const courseMeetings = schedule.filter(item => item.courseId === existing.courseId);
+  const byWeekday = new Map(courseMeetings.map(item => [item.weekday, item]));
+  const now = new Date().toISOString();
+  const records = value.weekdays.map(weekday => {
+    const previous = byWeekday.get(weekday);
+    return { meetingId: previous?.meetingId || randomUUID(), courseId: existing.courseId, weekday,
+      slotIndex: value.slot.slotIndex, startMinutes: value.slot.startMinutes, endMinutes: value.slot.endMinutes,
+      room: value.room, createdAt: previous?.createdAt || now };
+  });
+  await db.save('CourseMeeting', records);
   await db.save('Course', { ...existing.course, name: value.name, code: value.code, instructor: value.instructor, color: value.color });
-  const { course: _course, ...meeting } = existing;
-  await db.save('CourseMeeting', { ...meeting, weekday: value.weekday, slotIndex: value.slot.slotIndex,
-    startMinutes: value.slot.startMinutes, endMinutes: value.slot.endMinutes, room: value.room });
+  const retained = new Set(records.map(record => record.meetingId));
+  for (const meeting of courseMeetings) if (!retained.has(meeting.meetingId)) await db.delete('CourseMeeting', meeting.meetingId);
 }
 
 async function servePage(response, env) {
@@ -145,8 +171,8 @@ export function createApplication(options = {}) {
       if (!sameOrigin(request)) return json(response, 403, { error: 'Request origin was not accepted.' });
       if (request.method === 'GET' && url.pathname === '/api/schedule') return json(response, 200, { schedule: await loadSchedule(getDb()), slots });
       if (request.method === 'POST' && url.pathname === '/api/schedule') {
-        const meetingId = await saveNew(getDb(), await body(request));
-        return json(response, 201, { meetingId });
+        const meetingIds = await saveNew(getDb(), await body(request));
+        return json(response, 201, { meetingIds });
       }
       const match = url.pathname.match(/^\/api\/schedule\/([0-9a-f-]{36})$/i);
       if (match && request.method === 'PATCH') {
@@ -157,7 +183,9 @@ export function createApplication(options = {}) {
         const schedule = await loadSchedule(getDb());
         const existing = schedule.find(item => item.meetingId === match[1]);
         if (!existing) return json(response, 404, { error: 'Course not found.' });
-        await getDb().delete('CourseMeeting', existing.meetingId);
+        for (const meeting of schedule.filter(item => item.courseId === existing.courseId)) {
+          await getDb().delete('CourseMeeting', meeting.meetingId);
+        }
         await getDb().delete('Course', existing.courseId);
         return json(response, 200, { ok: true });
       }

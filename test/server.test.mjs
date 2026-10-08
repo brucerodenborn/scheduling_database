@@ -16,6 +16,7 @@ function fakeDatabase() {
       return { limit() { return this; }, async list() { return [...tables[table]]; } };
     },
     async save(table, row) {
+      if (Array.isArray(row)) return Promise.all(row.map(item => this.save(table, item)));
       const key = table === 'Course' ? 'courseId' : 'meetingId';
       const index = tables[table].findIndex(item => item[key] === row[key]);
       const saved = Object.fromEntries(Object.entries(row).filter(([, value]) => value !== undefined));
@@ -60,28 +61,33 @@ test('requires a signed workspace session for data routes', async () => withServ
   assert.equal((await fetch(`${origin}/api/schedule`, { headers: { Authorization: 'Bearer wrong' } })).status, 401);
 }));
 
-test('creates, lists, updates, rejects conflicts and deletes courses', async () => withServer(async ({ origin, db }) => {
-  const created = await fetch(`${origin}/api/schedule`, { method: 'POST', headers: headers(origin), body: JSON.stringify(course) });
+test('creates, lists, updates and deletes a recurring course', async () => withServer(async ({ origin, db }) => {
+  const created = await fetch(`${origin}/api/schedule`, { method: 'POST', headers: headers(origin), body: JSON.stringify({ ...course, weekdays: [1, 3, 5] }) });
   assert.equal(created.status, 201);
-  const { meetingId } = await created.json();
-  assert.match(meetingId, /^[0-9a-f-]{36}$/);
+  const { meetingIds } = await created.json();
+  assert.equal(meetingIds.length, 3);
+  assert.match(meetingIds[0], /^[0-9a-f-]{36}$/);
   assert.equal(db.tables.Course.length, 1);
-  assert.equal(db.tables.CourseMeeting[0].startMinutes, 480);
-  assert.equal(db.tables.CourseMeeting[0].endMinutes, 540);
+  assert.deepEqual(db.tables.CourseMeeting.map(item => item.weekday), [1, 3, 5]);
+  assert.ok(db.tables.CourseMeeting.every(item => item.courseId === db.tables.Course[0].courseId));
+  assert.ok(db.tables.CourseMeeting.every(item => item.startMinutes === 480 && item.endMinutes === 540));
 
   const list = await (await fetch(`${origin}/api/schedule`, { headers: headers(origin) })).json();
   assert.equal(list.schedule[0].course.name, 'Biology');
+  assert.equal(list.schedule.length, 3);
   assert.equal(list.slots.length, 7);
 
-  const conflict = await fetch(`${origin}/api/schedule`, { method: 'POST', headers: headers(origin), body: JSON.stringify({ ...course, name: 'Chemistry' }) });
+  const conflict = await fetch(`${origin}/api/schedule`, { method: 'POST', headers: headers(origin), body: JSON.stringify({ ...course, name: 'Chemistry', weekday: 2, weekdays: [2, 3] }) });
   assert.equal(conflict.status, 409);
+  assert.match((await conflict.json()).error, /Wednesday/);
 
-  const updated = await fetch(`${origin}/api/schedule/${meetingId}`, { method: 'PATCH', headers: headers(origin), body: JSON.stringify({ ...course, name: 'Advanced Biology', weekday: 3, slotIndex: 6 }) });
+  const updated = await fetch(`${origin}/api/schedule/${meetingIds[0]}`, { method: 'PATCH', headers: headers(origin), body: JSON.stringify({ ...course, name: 'Advanced Biology', weekday: 2, weekdays: [2, 4], slotIndex: 6 }) });
   assert.equal(updated.status, 200);
   assert.equal(db.tables.Course[0].name, 'Advanced Biology');
-  assert.equal(db.tables.CourseMeeting[0].startMinutes, 900);
+  assert.deepEqual(db.tables.CourseMeeting.map(item => item.weekday).sort(), [2, 4]);
+  assert.ok(db.tables.CourseMeeting.every(item => item.startMinutes === 900));
 
-  const deleted = await fetch(`${origin}/api/schedule/${meetingId}`, { method: 'DELETE', headers: headers(origin) });
+  const deleted = await fetch(`${origin}/api/schedule/${db.tables.CourseMeeting[0].meetingId}`, { method: 'DELETE', headers: headers(origin) });
   assert.equal(deleted.status, 200);
   assert.equal(db.tables.Course.length, 0);
   assert.equal(db.tables.CourseMeeting.length, 0);
