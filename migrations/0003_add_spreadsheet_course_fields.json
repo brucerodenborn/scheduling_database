@@ -1,0 +1,19 @@
+{
+  "id": "0003_add_spreadsheet_course_fields",
+  "expand": {
+    "revisionDescription": "Add course fields from the scheduling spreadsheet",
+    "entities": [
+      {
+        "name": "Course",
+        "attributes": [
+          { "name": "specificRoomPreference", "type": "String", "isNullable": true },
+          { "name": "seatCountIfNotThirty", "type": "Int", "isNullable": true },
+          { "name": "generalEducationTags", "type": "String", "isNullable": true },
+          { "name": "crosslistedCourses", "type": "String", "isNullable": true },
+          { "name": "falseLimitsDuringRegistration", "type": "Boolean", "isNullable": true },
+          { "name": "classroomNeeds", "type": "String", "isNullable": true }
+        ]
+      }
+    ]
+  }
+}

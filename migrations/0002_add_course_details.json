@@ -1,0 +1,23 @@
+{
+  "id": "0002_add_course_details",
+  "expand": {
+    "revisionDescription": "Add spreadsheet course details for records and exports",
+    "entities": [
+      {
+        "name": "Course",
+        "attributes": [
+          { "name": "section", "type": "String", "isNullable": true },
+          { "name": "department", "type": "String", "isNullable": true },
+          { "name": "term", "type": "String", "isNullable": true },
+          { "name": "startDate", "type": "String", "isNullable": true },
+          { "name": "endDate", "type": "String", "isNullable": true },
+          { "name": "deliveryMode", "type": "String", "isNullable": true },
+          { "name": "creditHours", "type": "Float", "isNullable": true },
+          { "name": "enrollment", "type": "Int", "isNullable": true },
+          { "name": "capacity", "type": "Int", "isNullable": true },
+          { "name": "notes", "type": "String", "isNullable": true }
+        ]
+      }
+    ]
+  }
+}

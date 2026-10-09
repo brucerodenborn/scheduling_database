@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
+import ExcelJS from 'exceljs';
 import { createApplication } from '../server/index.mjs';
 import { database } from '../server/database.mjs';
 
@@ -45,7 +46,10 @@ async function withServer(action) {
 }
 
 const headers = origin => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Origin: origin });
-const course = { name: 'Biology', code: 'BIO 101', instructor: 'Dr. Rivera', room: '204', color: 'sage', weekday: 1, slotIndex: 0 };
+const course = { name: 'Biology', code: 'BIO 101', section: '02', department: 'Science', instructor: 'Dr. Rivera', room: '204', color: 'sage', weekday: 1, slotIndex: 0,
+  term: 'Fall 2026', startDate: '2026-08-24', endDate: '2026-12-11', deliveryMode: 'In person', creditHours: 4, enrollment: 18, capacity: 24, notes: 'Bring lab materials.',
+  specificRoomPreference: 'Science 210', seatCountIfNotThirty: 24, generalEducationTags: 'E1, A', crosslistedCourses: 'BIO 201', falseLimitsDuringRegistration: true,
+  classroomNeeds: 'Movable tables and a demonstration bench. The room must contain a projector and sink.' };
 
 test('serves the scheduler, assets and readiness', async () => withServer(async ({ origin }) => {
   const page = await fetch(origin);
@@ -55,15 +59,19 @@ test('serves the scheduler, assets and readiness', async () => withServer(async 
   assert.ok(markup.indexOf('Monday–Wednesday–Friday') < markup.indexOf('Tuesday–Thursday'));
   assert.ok(markup.indexOf('Tuesday–Thursday') < markup.indexOf('<optgroup label="Single day">'));
   assert.doesNotMatch(markup, /Also repeat on/);
-  assert.match(markup, /\/app\.js\?v=5/);
-  const script = await fetch(`${origin}/app.js?v=5`);
+  assert.match(markup, /Course records/);
+  assert.match(markup, /Export XLSX/);
+  assert.match(markup, /Specific room preference/);
+  assert.match(markup, /Classroom needs/);
+  assert.match(markup, /\/app\.js\?v=7/);
+  const script = await fetch(`${origin}/app.js?v=7`);
   assert.equal(script.status, 200);
   assert.equal(script.headers.get('cache-control'), 'no-store');
   const source = await script.text();
   assert.doesNotMatch(source, /\bconfirm\(/);
   assert.match(source, /Confirm delete everywhere/);
   assert.match(source, /add-to-slot/);
-  assert.equal((await fetch(`${origin}/styles.css?v=5`)).status, 200);
+  assert.equal((await fetch(`${origin}/styles.css?v=7`)).status, 200);
   assert.deepEqual(await (await fetch(`${origin}/health/ready`)).json(), { status: 'ready' });
   assert.equal((await fetch(`${origin}/missing`)).status, 404);
 }));
@@ -80,6 +88,11 @@ test('creates, lists, updates and deletes a recurring course', async () => withS
   assert.equal(meetingIds.length, 3);
   assert.match(meetingIds[0], /^[0-9a-f-]{36}$/);
   assert.equal(db.tables.Course.length, 1);
+  assert.equal(db.tables.Course[0].section, '02');
+  assert.equal(db.tables.Course[0].creditHours, 4);
+  assert.equal(db.tables.Course[0].specificRoomPreference, 'Science 210');
+  assert.equal(db.tables.Course[0].falseLimitsDuringRegistration, true);
+  assert.match(db.tables.Course[0].classroomNeeds, /demonstration bench/);
   assert.deepEqual(db.tables.CourseMeeting.map(item => item.weekday), [1, 3, 5]);
   assert.ok(db.tables.CourseMeeting.every(item => item.courseId === db.tables.Course[0].courseId));
   assert.ok(db.tables.CourseMeeting.every(item => item.startMinutes === 480 && item.endMinutes === 540));
@@ -108,6 +121,31 @@ test('creates, lists, updates and deletes a recurring course', async () => withS
   assert.equal(db.tables.Course.length, 1);
   assert.equal(db.tables.CourseMeeting.length, 2);
   assert.equal(db.tables.Course[0].name, 'Chemistry');
+}));
+
+test('exports one spreadsheet-style row per course as CSV and XLSX', async () => withServer(async ({ origin }) => {
+  await fetch(`${origin}/api/schedule`, { method: 'POST', headers: headers(origin), body: JSON.stringify({ ...course, weekdays: [1, 3] }) });
+  const csvResponse = await fetch(`${origin}/api/export.csv`, { headers: headers(origin) });
+  assert.equal(csvResponse.status, 200);
+  assert.match(csvResponse.headers.get('content-type'), /text\/csv/);
+  assert.match(csvResponse.headers.get('content-disposition'), /course-schedule\.csv/);
+  const csv = await csvResponse.text();
+  assert.match(csv, /"Course Number","Section","Days","Time","Instructor\(s\)","Specific Room Preference"/);
+  assert.match(csv, /"BIO 101","02","MW","8:00 AM - 9:00 AM","Dr. Rivera","Science 210","24","Biology","E1, A","BIO 201","Yes"/);
+
+  const xlsxResponse = await fetch(`${origin}/api/export.xlsx`, { headers: headers(origin) });
+  assert.equal(xlsxResponse.status, 200);
+  assert.match(xlsxResponse.headers.get('content-type'), /spreadsheetml/);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(Buffer.from(await xlsxResponse.arrayBuffer()));
+  const sheet = workbook.getWorksheet('Course Schedule');
+  assert.equal(sheet.rowCount, 2);
+  assert.equal(sheet.getCell('A2').value, 'BIO 101');
+  assert.equal(sheet.getCell('C2').value, 'MW');
+  assert.equal(sheet.getCell('F2').value, 'Science 210');
+  assert.equal(sheet.getCell('G2').value, 24);
+  assert.equal(sheet.getCell('K2').value, 'Yes');
+  assert.match(sheet.getCell('L2').value, /projector and sink/);
 }));
 
 test('rejects invalid schedules and cross-origin mutations', async () => withServer(async ({ origin }) => {

@@ -6,7 +6,7 @@
   <meta name="auth-token" content="%%AUTH_TOKEN%%">
   <meta name="auth-ready" content="%%AUTH_READY%%">
   <title>Course Schedule</title>
-  <link rel="stylesheet" href="/styles.css?v=5">
+  <link rel="stylesheet" href="/styles.css?v=7">
 </head>
 <body>
   <div class="shell">
@@ -16,10 +16,14 @@
         <span>Course Schedule</span>
       </a>
       <nav aria-label="Main navigation">
-        <a class="nav-item active" href="/">
+        <button class="nav-item active" id="show-schedule" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11ZM8 2v4M16 2v4M4 9h16"/></svg>
           Weekly schedule
-        </a>
+        </button>
+        <button class="nav-item" id="show-records" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5"/></svg>
+          Course records
+        </button>
       </nav>
       <div class="day-settings">
         <p class="eyebrow">Day settings</p>
@@ -30,7 +34,7 @@
       </div>
     </aside>
 
-    <main>
+    <main id="schedule-view">
       <header class="topbar">
         <div>
           <p class="eyebrow">Academic planner</p>
@@ -62,6 +66,34 @@
         </div>
       </section>
     </main>
+
+    <main id="records-view" class="hidden">
+      <header class="topbar records-topbar">
+        <div>
+          <p class="eyebrow">Academic planner</p>
+          <h1>Course records</h1>
+        </div>
+        <div class="export-actions">
+          <button class="secondary export-button" data-format="csv" type="button">Export CSV</button>
+          <button class="primary export-button" data-format="xlsx" type="button">Export XLSX</button>
+        </div>
+      </header>
+      <section class="records-panel" aria-labelledby="records-title">
+        <div class="panel-heading">
+          <div><h2 id="records-title">All scheduled courses</h2><p id="records-count">— records</p></div>
+          <button class="refresh" id="records-refresh" type="button" aria-label="Refresh records">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7"/></svg>
+          </button>
+        </div>
+        <div class="message hidden" id="records-message" role="status"></div>
+        <div class="records-wrap">
+          <table class="records-table">
+            <thead><tr><th>Course</th><th>Schedule</th><th>Instructor</th><th>Term</th><th>Delivery</th><th>Enrollment</th><th></th></tr></thead>
+            <tbody id="records-body"><tr><td colspan="7" class="loading">Loading records…</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
   </div>
 
   <dialog id="course-dialog">
@@ -74,6 +106,10 @@
       <div class="field full"><label for="name">Course name</label><input id="name" name="name" maxlength="80" required autocomplete="off" placeholder="Introduction to Biology"></div>
       <div class="form-row">
         <div class="field"><label for="code">Course code</label><input id="code" name="code" maxlength="20" autocomplete="off" placeholder="BIO 101"></div>
+        <div class="field"><label for="section">Section</label><input id="section" name="section" maxlength="30" autocomplete="off" placeholder="01"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label for="department">Department</label><input id="department" name="department" maxlength="60" autocomplete="off" placeholder="Physics"></div>
         <div class="field"><label for="instructor">Instructor</label><input id="instructor" name="instructor" maxlength="80" autocomplete="off" placeholder="Dr. Rivera"></div>
       </div>
       <div class="form-row">
@@ -97,6 +133,34 @@
         <div class="field"><label for="room">Room</label><input id="room" name="room" maxlength="40" autocomplete="off" placeholder="Room 204"></div>
         <fieldset class="field color-field"><legend>Color</legend><div class="colors" id="colors"></div></fieldset>
       </div>
+      <div class="form-divider"></div>
+      <div class="form-row">
+        <div class="field"><label for="term">Term</label><input id="term" name="term" maxlength="40" autocomplete="off" placeholder="Fall 2026"></div>
+        <div class="field"><label for="deliveryMode">Delivery mode</label><select id="deliveryMode" name="deliveryMode"><option value="">Select</option><option>In person</option><option>Online</option><option>Hybrid</option></select></div>
+      </div>
+      <div class="form-row form-row-three">
+        <div class="field"><label for="creditHours">Credit hours</label><input id="creditHours" name="creditHours" type="number" min="0" max="50" step="0.25" inputmode="decimal"></div>
+        <div class="field"><label for="enrollment">Enrollment</label><input id="enrollment" name="enrollment" type="number" min="0" max="100000" step="1" inputmode="numeric"></div>
+        <div class="field"><label for="capacity">Capacity</label><input id="capacity" name="capacity" type="number" min="0" max="100000" step="1" inputmode="numeric"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label for="startDate">Start date</label><input id="startDate" name="startDate" type="date"></div>
+        <div class="field"><label for="endDate">End date</label><input id="endDate" name="endDate" type="date"></div>
+      </div>
+      <div class="field notes-field"><label for="notes">Notes</label><textarea id="notes" name="notes" maxlength="2000" rows="3"></textarea></div>
+      <div class="form-divider"></div>
+      <div class="form-row">
+        <div class="field"><label for="specificRoomPreference">Specific room preference</label><input id="specificRoomPreference" name="specificRoomPreference" maxlength="120" autocomplete="off"></div>
+        <div class="field"><label for="seatCountIfNotThirty"># of seats if ≠ 30</label><input id="seatCountIfNotThirty" name="seatCountIfNotThirty" type="number" min="0" max="100000" step="1" inputmode="numeric"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label for="generalEducationTags">General education tags</label><input id="generalEducationTags" name="generalEducationTags" maxlength="120" autocomplete="off" placeholder="E1, A, R"></div>
+        <div class="field"><label for="crosslistedCourses">Crosslisted?</label><input id="crosslistedCourses" name="crosslistedCourses" maxlength="200" autocomplete="off" placeholder="No, or provide course number(s)"></div>
+      </div>
+      <div class="form-row">
+        <div class="field"><label for="falseLimitsDuringRegistration">False limits during registration?</label><select id="falseLimitsDuringRegistration" name="falseLimitsDuringRegistration"><option value="">Select</option><option value="false">No</option><option value="true">Yes</option></select></div>
+      </div>
+      <div class="field notes-field"><label for="classroomNeeds">Classroom needs</label><textarea id="classroomNeeds" name="classroomNeeds" maxlength="1500" rows="4"></textarea></div>
       <div class="form-error hidden" id="form-error" role="alert"></div>
       <div class="dialog-actions">
         <button class="danger hidden" id="delete-course" type="button">Delete course</button>
@@ -106,6 +170,6 @@
       </div>
     </form>
   </dialog>
-  <script src="/app.js?v=5" defer></script>
+  <script src="/app.js?v=7" defer></script>
 </body>
 </html>
