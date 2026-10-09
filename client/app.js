@@ -11,12 +11,47 @@ const formError = document.querySelector('#form-error');
 const deleteButton = document.querySelector('#delete-course');
 const recordsBody = document.querySelector('#records-body');
 const recordsMessage = document.querySelector('#records-message');
+const reportBody = document.querySelector('#report-body');
+const reportMessage = document.querySelector('#report-message');
+const recordsTerm = document.querySelector('#records-term');
+const reportStartDate = document.querySelector('#report-start-date');
+const reportEndDate = document.querySelector('#report-end-date');
 let schedule = [];
 let slots = fallbackSlots;
+let terms = [];
+let reportData = null;
+let requiredCreditHours = 18;
 
 const formatTime = minutes => new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' })
   .format(new Date(Date.UTC(2020, 0, 1, 0, minutes)));
 const slotLabel = slot => `${formatTime(slot.startMinutes)}–${formatTime(slot.endMinutes)}`;
+
+function academicYearTerms() {
+  const now = new Date();
+  const academicStartYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  return [`Fall ${academicStartYear}`, `Centre Term ${academicStartYear + 1}`, `Spring ${academicStartYear + 1}`];
+}
+
+function defaultTermDates(name, allowInferredYear = true) {
+  const normalized = name.trim().toLocaleLowerCase('en-US');
+  const statedYear = name.match(/\b(20\d{2})\b/)?.[1];
+  if (!statedYear && !allowInferredYear) return null;
+  const now = new Date();
+  const academicStartYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const year = Number(statedYear || (normalized.includes('fall') ? academicStartYear : academicStartYear + 1));
+  if (normalized.includes('fall')) return { startDate: `${year}-08-15`, endDate: `${year}-12-15` };
+  if (normalized.includes('centre term') || normalized.includes('center term')) return { startDate: `${year}-01-01`, endDate: `${year}-01-28` };
+  if (normalized.includes('spring')) return { startDate: `${year}-02-01`, endDate: `${year}-05-15` };
+  return null;
+}
+
+function populateTermDates(allowInferredYear = true) {
+  const name = form.elements.termName.value.trim();
+  const selected = terms.find(term => term.normalizedName === name.toLocaleLowerCase('en-US'));
+  const defaults = defaultTermDates(name, allowInferredYear);
+  form.elements.termStartDate.value = selected?.startDate?.slice(0, 10) || defaults?.startDate || '';
+  form.elements.termEndDate.value = selected?.endDate?.slice(0, 10) || defaults?.endDate || '';
+}
 
 async function api(path, options = {}) {
   const response = await fetch(path, { ...options, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...options.headers } });
@@ -72,7 +107,10 @@ function render() {
 }
 
 function renderRecords() {
-  const courses = [...new Map(schedule.map(item => [item.courseId, item])).values()]
+  const selectedTermId = recordsTerm.value;
+  const visibleSchedule = selectedTermId ? schedule.filter(item => item.course.termId === selectedTermId) : schedule;
+  document.querySelector('#records-title').textContent = terms.find(term => term.termId === selectedTermId)?.name || 'All scheduled courses';
+  const courses = [...new Map(visibleSchedule.map(item => [item.courseId, item])).values()]
     .sort((a, b) => (a.course.code || a.course.name).localeCompare(b.course.code || b.course.name));
   recordsBody.replaceChildren();
   document.querySelector('#records-count').textContent = `${courses.length} ${courses.length === 1 ? 'record' : 'records'}`;
@@ -82,7 +120,7 @@ function renderRecords() {
     cell.colSpan = 7; row.append(cell); recordsBody.append(row); return;
   }
   for (const item of courses) {
-    const meetings = schedule.filter(entry => entry.courseId === item.courseId).sort((a, b) => a.weekday - b.weekday);
+    const meetings = visibleSchedule.filter(entry => entry.courseId === item.courseId).sort((a, b) => a.weekday - b.weekday);
     const row = document.createElement('tr');
     const courseCell = document.createElement('td');
     courseCell.append(make('strong', '', [item.course.code, item.course.section].filter(Boolean).join(' · ') || item.course.name));
@@ -91,7 +129,7 @@ function renderRecords() {
     scheduleCell.append(make('strong', '', meetings.map(meeting => days[meeting.weekday - 1].slice(0, 3)).join(', ')));
     scheduleCell.append(make('span', '', `${formatTime(item.startMinutes)}–${formatTime(item.endMinutes)} · ${item.room || 'No room'}`));
     const instructor = make('td', '', item.course.instructor || '—');
-    const term = make('td', '', item.course.term || '—');
+    const term = make('td', '', item.course.academicTerm?.name || '—');
     const delivery = make('td', '', item.course.deliveryMode || '—');
     const enrolled = item.course.enrollment ?? '';
     const capacity = item.course.capacity ?? '';
@@ -104,24 +142,72 @@ function renderRecords() {
   }
 }
 
+function renderReport() {
+  reportBody.replaceChildren();
+  if (!reportData?.includedTerms.length) {
+    const row = document.createElement('tr'); const cell = make('td', 'empty-records', 'No dated terms overlap this range. Add term dates in a course record.');
+    cell.colSpan = 5; row.append(cell); reportBody.append(row);
+    document.querySelector('#load-count').textContent = '0 instructors'; return;
+  }
+  const title = reportData.includedTerms.length === 1 ? reportData.includedTerms[0].name : `${reportData.includedTerms.length} terms`;
+  document.querySelector('#load-title').textContent = title;
+  document.querySelector('#load-count').textContent = `${reportData.instructors.length} ${reportData.instructors.length === 1 ? 'instructor' : 'instructors'}`;
+  if (!reportData.instructors.length) {
+    const row = document.createElement('tr'); const cell = make('td', 'empty-records', 'No instructor hours are assigned to this term.');
+    cell.colSpan = 5; row.append(cell); reportBody.append(row); return;
+  }
+  for (const instructor of reportData.instructors) {
+    const row = document.createElement('tr');
+    row.append(make('td', 'instructor-name', instructor.name));
+    const coursesCell = document.createElement('td');
+    for (const course of instructor.courses) coursesCell.append(make('span', 'load-course', `${[course.code, course.section].filter(Boolean).join(' · ') || course.name} · ${course.termName} · ${course.creditHours} hr`));
+    const total = make('td', 'load-total', `${instructor.totalCreditHours} / ${requiredCreditHours}`);
+    const remaining = make('td', instructor.requirementMet ? 'requirement-met' : 'requirement-open', instructor.requirementMet ? 'Met' : `${instructor.remainingCreditHours} hr`);
+    const progressCell = document.createElement('td');
+    const track = make('div', 'progress-track'); const bar = make('span', instructor.requirementMet ? 'progress-bar met' : 'progress-bar');
+    bar.style.width = `${Math.min(100, (instructor.totalCreditHours / requiredCreditHours) * 100)}%`;
+    track.setAttribute('aria-label', `${instructor.totalCreditHours} of ${requiredCreditHours} credit hours`);
+    track.append(bar); progressCell.append(track);
+    row.append(coursesCell, total, remaining, progressCell); reportBody.append(row);
+  }
+}
+
+function setTermOptions() {
+  const names = [...new Set([...terms.map(term => term.name), ...academicYearTerms()])];
+  document.querySelector('#term-options').replaceChildren(...names.map(name => new Option(name)));
+  const previous = recordsTerm.value;
+  recordsTerm.replaceChildren(new Option('All terms', ''), ...terms.map(term => new Option(term.name, term.termId)));
+  if (terms.some(term => term.termId === previous)) recordsTerm.value = previous;
+  document.querySelectorAll('.export-button').forEach(button => { button.disabled = !recordsTerm.value; });
+}
+
 async function load() {
   showMessage();
   recordsMessage.textContent = '';
   recordsMessage.classList.add('hidden');
+  reportMessage.textContent = '';
+  reportMessage.classList.add('hidden');
   if (!authReady) {
     grid.replaceChildren(make('div', 'loading', 'Open this app from your authenticated workspace preview.'));
     recordsBody.replaceChildren();
     const row = document.createElement('tr'); const cell = make('td', 'empty-records', 'Open this app from your authenticated workspace preview.');
     cell.colSpan = 7; row.append(cell); recordsBody.append(row);
+    reportBody.replaceChildren();
+    const reportRow = document.createElement('tr'); const reportCell = make('td', 'empty-records', 'Open this app from your authenticated workspace preview.');
+    reportCell.colSpan = 5; reportRow.append(reportCell); reportBody.append(reportRow);
     showMessage('Your workspace session is not available.');
     return;
   }
   try {
-    const result = await api('/api/schedule');
-    schedule = result.schedule;
-    slots = result.slots;
+    const [result, loadReport] = await Promise.all([api('/api/schedule'), api('/api/reports/instructor-load')]);
+    schedule = result.schedule; slots = result.slots; terms = result.terms;
+    reportData = loadReport; requiredCreditHours = loadReport.requiredCreditHours;
+    reportStartDate.value = loadReport.range.startDate || '';
+    reportEndDate.value = loadReport.range.endDate || '';
+    setTermOptions();
     render();
     renderRecords();
+    renderReport();
   } catch (error) {
     grid.replaceChildren(make('div', 'loading', 'Schedule unavailable'));
     recordsBody.replaceChildren();
@@ -129,6 +215,10 @@ async function load() {
     cell.colSpan = 7; row.append(cell); recordsBody.append(row);
     showMessage(error.message);
     recordsMessage.textContent = error.message; recordsMessage.classList.remove('hidden');
+    reportBody.replaceChildren();
+    const reportRow = document.createElement('tr'); const reportCell = make('td', 'empty-records', 'Instructor load unavailable');
+    reportCell.colSpan = 5; reportRow.append(reportCell); reportBody.append(reportRow);
+    reportMessage.textContent = error.message; reportMessage.classList.remove('hidden');
   }
 }
 
@@ -144,6 +234,20 @@ function setOptions() {
     const dot = make('span', color); dot.title = color;
     label.append(input, dot); colors.append(label);
   });
+}
+
+async function loadReportRange() {
+  if (!reportStartDate.value || !reportEndDate.value) return;
+  reportMessage.textContent = '';
+  reportMessage.classList.add('hidden');
+  try {
+    const query = new URLSearchParams({ startDate: reportStartDate.value, endDate: reportEndDate.value });
+    reportData = await api(`/api/reports/instructor-load?${query}`);
+    requiredCreditHours = reportData.requiredCreditHours;
+    renderReport();
+  } catch (error) {
+    reportMessage.textContent = error.message; reportMessage.classList.remove('hidden');
+  }
 }
 
 function setDaySchedule(selectedDays) {
@@ -173,9 +277,11 @@ function openDialog(item, weekday = 1, slotIndex = 0) {
   form.elements.instructor.value = item?.course.instructor || '';
   form.elements.section.value = item?.course.section || '';
   form.elements.department.value = item?.course.department || '';
-  form.elements.term.value = item?.course.term || '';
-  form.elements.startDate.value = item?.course.startDate || '';
-  form.elements.endDate.value = item?.course.endDate || '';
+  const termName = item?.course.academicTerm?.name || '';
+  const termDefaults = defaultTermDates(termName);
+  form.elements.termName.value = termName;
+  form.elements.termStartDate.value = item?.course.academicTerm?.startDate?.slice(0, 10) || termDefaults?.startDate || '';
+  form.elements.termEndDate.value = item?.course.academicTerm?.endDate?.slice(0, 10) || termDefaults?.endDate || '';
   form.elements.deliveryMode.value = item?.course.deliveryMode || '';
   form.elements.creditHours.value = item?.course.creditHours ?? '';
   form.elements.enrollment.value = item?.course.enrollment ?? '';
@@ -211,30 +317,35 @@ function formPayload() {
 }
 
 function selectView(view) {
-  const records = view === 'records';
-  document.querySelector('#schedule-view').classList.toggle('hidden', records);
-  document.querySelector('#records-view').classList.toggle('hidden', !records);
-  document.querySelector('#show-schedule').classList.toggle('active', !records);
-  document.querySelector('#show-records').classList.toggle('active', records);
+  for (const name of ['schedule', 'records', 'report']) {
+    document.querySelector(`#${name}-view`).classList.toggle('hidden', view !== name);
+    document.querySelector(`#show-${name}`).classList.toggle('active', view === name);
+  }
 }
 
 async function download(format, button) {
+  const termId = recordsTerm.value;
+  if (!termId) {
+    recordsMessage.textContent = 'Choose a term before exporting.'; recordsMessage.classList.remove('hidden'); return;
+  }
   button.disabled = true;
   recordsMessage.classList.add('hidden');
   try {
-    const response = await fetch(`/api/export.${format}`, { headers: { Authorization: `Bearer ${token}` } });
+    const response = await fetch(`/api/export.${format}?${new URLSearchParams({ termId })}`, { headers: { Authorization: `Bearer ${token}` } });
     if (!response.ok) {
       const payload = await response.json().catch(() => ({}));
       throw new Error(payload.error || 'The export could not be created.');
     }
     const blob = await response.blob();
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob); link.download = `course-schedule.${format}`;
+    const term = terms.find(item => item.termId === termId);
+    const slug = term?.name.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'term';
+    link.href = URL.createObjectURL(blob); link.download = `course-schedule-${slug}.${format}`;
     document.body.append(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   } catch (error) {
     recordsMessage.textContent = error.message; recordsMessage.classList.remove('hidden');
-  } finally { button.disabled = false; }
+  } finally { button.disabled = !recordsTerm.value; }
 }
 
 form.addEventListener('submit', async event => {
@@ -275,8 +386,19 @@ document.querySelector('#add-course').addEventListener('click', () => {
 });
 document.querySelector('#refresh').addEventListener('click', load);
 document.querySelector('#records-refresh').addEventListener('click', load);
+document.querySelector('#report-refresh').addEventListener('click', loadReportRange);
 document.querySelector('#show-schedule').addEventListener('click', () => selectView('schedule'));
 document.querySelector('#show-records').addEventListener('click', () => selectView('records'));
+document.querySelector('#show-report').addEventListener('click', () => selectView('report'));
+recordsTerm.addEventListener('change', () => {
+  renderRecords();
+  recordsMessage.textContent = '';
+  recordsMessage.classList.add('hidden');
+  document.querySelectorAll('.export-button').forEach(button => { button.disabled = !recordsTerm.value; });
+});
+for (const input of [reportStartDate, reportEndDate]) input.addEventListener('change', loadReportRange);
+form.elements.termName.addEventListener('input', () => populateTermDates(false));
+form.elements.termName.addEventListener('change', () => populateTermDates(true));
 document.querySelectorAll('.export-button').forEach(button => button.addEventListener('click', () => download(button.dataset.format, button)));
 document.querySelector('#close-dialog').addEventListener('click', closeDialog);
 document.querySelector('#cancel-dialog').addEventListener('click', closeDialog);

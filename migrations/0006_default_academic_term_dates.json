@@ -1,0 +1,6 @@
+{
+  "id": "0006_default_academic_term_dates",
+  "transform": "scripts/0006_default_academic_term_dates.mjs",
+  "verify": "scripts/0006_verify_academic_term_dates.mjs",
+  "resumable": true
+}

@@ -13,9 +13,6 @@
         { "name": "createdAt", "type": "Timestamp", "isNullable": false },
         { "name": "section", "type": "String", "isNullable": true },
         { "name": "department", "type": "String", "isNullable": true },
-        { "name": "term", "type": "String", "isNullable": true },
-        { "name": "startDate", "type": "String", "isNullable": true },
-        { "name": "endDate", "type": "String", "isNullable": true },
         { "name": "deliveryMode", "type": "String", "isNullable": true },
         { "name": "creditHours", "type": "Float", "isNullable": true },
         { "name": "enrollment", "type": "Int", "isNullable": true },
@@ -26,11 +23,13 @@
         { "name": "generalEducationTags", "type": "String", "isNullable": true },
         { "name": "crosslistedCourses", "type": "String", "isNullable": true },
         { "name": "falseLimitsDuringRegistration", "type": "Boolean", "isNullable": true },
-        { "name": "classroomNeeds", "type": "String", "isNullable": true }
+        { "name": "classroomNeeds", "type": "String", "isNullable": true },
+        { "name": "termId", "type": "String", "isNullable": true }
       ],
       "indexes": [
         { "name": "name", "type": "DEFAULT" },
-        { "name": "code", "type": "DEFAULT" }
+        { "name": "code", "type": "DEFAULT" },
+        { "name": "termId", "type": "DEFAULT" }
       ]
     },
     {
@@ -51,6 +50,25 @@
         { "name": "courseId", "type": "DEFAULT" },
         { "name": "weekday", "type": "DEFAULT" },
         { "name": "slotIndex", "type": "DEFAULT" }
+      ]
+    },
+    {
+      "name": "AcademicTerm",
+      "identifier": { "name": "termId", "generator": "UUID", "type": "String" },
+      "type": "DEFAULT",
+      "attributes": [
+        { "name": "termId", "type": "String", "isNullable": false },
+        { "name": "name", "type": "String", "isNullable": false },
+        { "name": "normalizedName", "type": "String", "isNullable": false },
+        { "name": "createdAt", "type": "Timestamp", "isNullable": false },
+        { "name": "startDate", "type": "Timestamp", "isNullable": true },
+        { "name": "endDate", "type": "Timestamp", "isNullable": true }
+      ],
+      "indexes": [
+        { "name": "name", "type": "DEFAULT" },
+        { "name": "normalizedName", "type": "DEFAULT" },
+        { "name": "startDate", "type": "DEFAULT" },
+        { "name": "endDate", "type": "DEFAULT" }
       ]
     }
   ]

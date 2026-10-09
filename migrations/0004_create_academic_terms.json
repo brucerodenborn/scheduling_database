@@ -1,0 +1,35 @@
+{
+  "id": "0004_create_academic_terms",
+  "expand": {
+    "revisionDescription": "Create academic terms and link courses for instructor load reporting",
+    "entities": [
+      {
+        "name": "AcademicTerm",
+        "identifier": { "name": "termId", "generator": "UUID", "type": "String" },
+        "type": "DEFAULT",
+        "attributes": [
+          { "name": "termId", "type": "String", "isNullable": false },
+          { "name": "name", "type": "String", "isNullable": false },
+          { "name": "normalizedName", "type": "String", "isNullable": false },
+          { "name": "createdAt", "type": "Timestamp", "isNullable": false }
+        ],
+        "indexes": [
+          { "name": "name", "type": "DEFAULT" },
+          { "name": "normalizedName", "type": "DEFAULT" }
+        ]
+      },
+      {
+        "name": "Course",
+        "attributes": [
+          { "name": "termId", "type": "String", "isNullable": true }
+        ],
+        "indexes": [
+          { "name": "termId", "type": "DEFAULT" }
+        ]
+      }
+    ]
+  },
+  "transform": "scripts/0004_link_academic_terms.mjs",
+  "verify": "scripts/0004_verify_academic_terms.mjs",
+  "resumable": true
+}

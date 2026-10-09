@@ -1,0 +1,19 @@
+{
+  "id": "0005_add_academic_term_dates",
+  "expand": {
+    "revisionDescription": "Add academic term dates for multi-term instructor load reports",
+    "entities": [
+      {
+        "name": "AcademicTerm",
+        "attributes": [
+          { "name": "startDate", "type": "Timestamp", "isNullable": true },
+          { "name": "endDate", "type": "Timestamp", "isNullable": true }
+        ],
+        "indexes": [
+          { "name": "startDate", "type": "DEFAULT" },
+          { "name": "endDate", "type": "DEFAULT" }
+        ]
+      }
+    ]
+  }
+}
